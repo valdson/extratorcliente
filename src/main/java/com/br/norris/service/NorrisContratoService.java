@@ -1,17 +1,19 @@
 package com.br.norris.service;
 
-import com.br.norris.dto.ContratoDetalheDTO;
-import com.br.norris.dto.ContratoResumoDTO;
+import com.br.norris.dto.*;
 import com.br.norris.entity.Cliente;
 import com.br.norris.entity.ControleSync;
+import com.br.norris.entity.Produto;
 import com.br.norris.repository.ClienteRepository;
 import com.br.norris.repository.ControleSyncRepository;
+import com.br.norris.repository.ProdutoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
 
@@ -25,7 +27,8 @@ import java.util.Map;
 public class NorrisContratoService {
     private static final String BASE_URL = "https://www.bling.com.br/Api/v3";
     private static final int LIMITE = 100;
-
+    @Autowired
+    private ProdutoRepository repositoryProduto;
     @Autowired
     private RestTemplate restTemplate;
     @Autowired
@@ -44,6 +47,106 @@ public class NorrisContratoService {
 
     public NorrisContratoService(BlingTokenService tokenService) {
         this.tokenService = tokenService;
+    }
+
+    public ProdutoResponse buscarProduto(String nome) {
+
+        List<Produto> produtos =
+                repositoryProduto.findByNomeContainingIgnoreCase(nome);
+
+        if (produtos.isEmpty()) {
+            return new ProdutoResponse(
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    "Produto não encontrado"
+            );
+        }
+
+        Produto produto = produtos.get(0);
+
+        return new ProdutoResponse(
+                true,
+                produto.getNome(),
+                produto.getCodigo(),
+                produto.getPreco(),
+                produto.getEstoque(),
+                produto.getImagemUrl(),
+                String.format(
+                        "%s custa R$ %.2f e possui %d unidades em estoque.",
+                        produto.getNome(),
+                        produto.getPreco(),
+                        produto.getEstoque()
+                )
+        );
+    }
+
+ /*   public List<ProdutoDTO> buscarProdutos(String accessToken) {
+
+        String url = "https://www.bling.com.br/Api/v3/produtos";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<ProdutosResponseDTO> response =
+                restTemplate.exchange(
+                        url,
+                        HttpMethod.GET,
+                        entity,
+                        ProdutosResponseDTO.class
+                );
+
+        return response.getBody().getData();
+    }*/
+
+    public List<ProdutoDTO> buscarProdutos(String accessToken) {
+
+        String urlBase = "https://www.bling.com.br/Api/v3/produtos";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(accessToken);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        List<ProdutoDTO> todosProdutos = new ArrayList<>();
+
+        int pagina = 1;
+        int tamanhoPagina = 100;
+
+        while (true) {
+
+            String url = urlBase + "?pagina=" + pagina + "&limite=" + tamanhoPagina;
+
+            ResponseEntity<ProdutosResponseDTO> response =
+                    restTemplate.exchange(
+                            url,
+                            HttpMethod.GET,
+                            entity,
+                            ProdutosResponseDTO.class
+                    );
+
+            ProdutosResponseDTO body = response.getBody();
+
+            if (body == null || body.getData() == null || body.getData().isEmpty()) {
+                break;
+            }
+
+            todosProdutos.addAll(body.getData());
+
+            // se veio menos que 100, acabou
+            if (body.getData().size() < tamanhoPagina) {
+                break;
+            }
+
+            pagina++;
+        }
+
+        return todosProdutos;
     }
 
     public void sincronizarContatos() {
@@ -230,4 +333,69 @@ public class NorrisContratoService {
 
         return response.getBody().toString();
     }
+
+    public String buscarAccessToken(){
+        return token = tokenService.getValidToken();
+    }
+
+    public void sincronizar(List<ProdutoDTO> produtos) {
+
+        for (ProdutoDTO dto : produtos) {
+            Produto produto =
+                    repositoryProduto.findById(dto.getId())
+                            .orElse(new Produto());
+
+            produto.setIdBling(dto.getId());
+            produto.setNome(dto.getNome());
+            produto.setCodigo(dto.getCodigo());
+            produto.setPreco(dto.getPreco());
+
+            if(dto.getEstoque() != null) {
+                produto.setEstoque(
+                        dto.getEstoque().getSaldoVirtualTotal()
+                );
+            }
+            produto.setDescricao(dto.getDescricaoCurta());
+
+            repositoryProduto.save(produto);
+        }
+    }
+
+    public ProdutoListResponse buscarInteligente(String query) {
+
+        String q = query.toLowerCase();
+
+        List<Produto> produtos = repositoryProduto.findAll();
+
+        List<Produto> filtrados = produtos.stream()
+                .filter(p ->
+                        p.getNome().toLowerCase().contains(q) ||
+                                (p.getCodigo() != null && p.getCodigo().toLowerCase().contains(q)) ||
+                                (p.getDescricao() != null && p.getDescricao().toLowerCase().contains(q))
+                )
+                .toList();
+
+        if (filtrados.isEmpty()) {
+            return new ProdutoListResponse(
+                    false,
+                    "Nenhum produto encontrado",
+                    List.of()
+            );
+        }
+
+        List<ProdutoResumo> lista = filtrados.stream()
+                .map(p -> new ProdutoResumo(
+                        p.getNome(),
+                        p.getPreco(),
+                        p.getEstoque()
+                ))
+                .toList();
+
+        return new ProdutoListResponse(
+                true,
+                "Produtos encontrados",
+                lista
+        );
+    }
+
 }
