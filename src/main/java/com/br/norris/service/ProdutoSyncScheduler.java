@@ -15,7 +15,7 @@ public class ProdutoSyncScheduler {
     private NorrisContratoService service;
 
     //Atualiza os dados na base de dades
-    @Scheduled(fixedRate = 120000) // 15 min
+    @Scheduled(fixedRate = 900000) // 15 min //120000 2 min
     public void atualizarProdutos() {
         String token = service.buscarAccessToken();
         List<ProdutoDTO> produtos =
