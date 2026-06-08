@@ -7,6 +7,7 @@ import com.br.norris.entity.Produto;
 import com.br.norris.repository.ClienteRepository;
 import com.br.norris.repository.ControleSyncRepository;
 import com.br.norris.repository.ProdutoRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
@@ -16,6 +17,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestTemplate;
 import tools.jackson.databind.JsonNode;
+import com.br.norris.service.UrlProdutoService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -23,8 +25,11 @@ import java.util.List;
 import java.util.Map;
 
 @Service
+@RequiredArgsConstructor
 
 public class NorrisContratoService {
+    @Autowired
+    private UrlProdutoService urlProdutoService;
     private static final String BASE_URL = "https://www.bling.com.br/Api/v3";
     private static final int LIMITE = 100;
     @Autowired
@@ -37,7 +42,8 @@ public class NorrisContratoService {
     private ControleSyncRepository controleRepository;
     @Value("${bling.token}")
     private String token;
-    private final BlingTokenService tokenService;
+    @Autowired
+    private BlingTokenService tokenService;
 
     @Value("${bling.client-id}")
     private String clientId;
@@ -45,8 +51,7 @@ public class NorrisContratoService {
     @Value("${bling.client-secret}")
     private String clientSecret;
 
-    public NorrisContratoService(BlingTokenService tokenService) {
-        this.tokenService = tokenService;
+    public NorrisContratoService(UrlProdutoService urlProdutoService, UrlProdutoService urlProdutoService1, BlingTokenService tokenService) {
     }
 
     public ProdutoResponse buscarProduto(String nome) {
@@ -341,6 +346,7 @@ public class NorrisContratoService {
     public void sincronizar(List<ProdutoDTO> produtos) {
 
         for (ProdutoDTO dto : produtos) {
+
             Produto produto =
                     repositoryProduto.findById(dto.getId())
                             .orElse(new Produto());
@@ -355,10 +361,13 @@ public class NorrisContratoService {
                         dto.getEstoque().getSaldoVirtualTotal()
                 );
             }
+
             produto.setDescricao(dto.getDescricaoCurta());
 
             repositoryProduto.save(produto);
         }
+
+        urlProdutoService.atualizarUrlsProdutos();
     }
 
     public ProdutoListResponse buscarInteligente(String query) {

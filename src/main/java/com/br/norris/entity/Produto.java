@@ -33,4 +33,7 @@ public class Produto {
     private LocalDateTime atualizadoEm;
 
     private String imagemUrl;
+
+    @Column(length = 1000)
+    private String urlProduto;
 }
