@@ -1,5 +1,6 @@
 package com.br.norris.dto;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -16,4 +17,6 @@ public class ProdutoResumo {
     private BigDecimal preco;
 
     private Integer estoque;
+
+    private String urlProduto;
 }

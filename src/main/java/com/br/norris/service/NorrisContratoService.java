@@ -400,7 +400,8 @@ public class NorrisContratoService {
                 .map(p -> new ProdutoResumo(
                         p.getNome(),
                         p.getPreco(),
-                        p.getEstoque()
+                        p.getEstoque(),
+                        p.getUrlProduto()
                 ))
                 .toList();
 
